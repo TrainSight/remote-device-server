@@ -27,9 +27,43 @@ async def health():
     return {"status": "ok"}
 
 
+def _print_banner():
+    import socket
+
+    # 获取本机 IP
+    ips = []
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in ips and ip != "127.0.0.1":
+                ips.append(ip)
+    except Exception:
+        pass
+    if not ips:
+        ips = ["127.0.0.1"]
+
+    print("=" * 50)
+    print("  Remote Device Server")
+    print("=" * 50)
+    print(f"  Host:      {settings.host}")
+    print(f"  Port:      {settings.port}")
+    print(f"  API Key:   {settings.api_key}")
+    print(f"  Workspace: {settings.workspace_root}")
+    print(f"  Log dir:   {settings.log_root}")
+    print(f"  DB:        {settings.db_path}")
+    print()
+    print("  Client config (~/.rds/config):")
+    for ip in ips:
+        print(f"    server_url=http://{ip}:{settings.port}")
+    print(f"    api_key={settings.api_key}")
+    print("=" * 50)
+    print()
+
+
 def run():
     import uvicorn
 
+    _print_banner()
     uvicorn.run(
         "server.main:app",
         host=settings.host,
