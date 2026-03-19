@@ -6,7 +6,6 @@ from client.skills.logs import LogsSkill
 from client.skills.push import PushSkill
 from client.skills.monitor import MonitorSkill
 from client.skills.sync import SyncSkill
-from client.skills.bench import KernelBenchSkill
 
 app = typer.Typer(
     name="rds",
@@ -16,7 +15,7 @@ app = typer.Typer(
 console = Console()
 
 # Register all skills
-for skill_cls in [SubmitSkill, LogsSkill, PushSkill, MonitorSkill, SyncSkill, KernelBenchSkill]:
+for skill_cls in [SubmitSkill, LogsSkill, PushSkill, MonitorSkill, SyncSkill]:
     skill_cls().register(app)
 
 
