@@ -2,52 +2,83 @@
 
 通过 HTTP API 在远端 GPU 机器上执行任务、查看日志、监控资源。
 
-## 远端环境
+## 快速开始
 
-- 8x NVIDIA A100-SXM4-80GB, 160 cores, 859GB RAM
-- Server 地址: `http://10.164.56.75:44401`
-- API Key: `remote_device_server` (通过 `X-API-Key` header 传递)
-- Python 3.8, CUDA 可用
+### 1. 配置连接信息
+
+创建配置文件 `~/.rds/config`：
+
+```bash
+mkdir -p ~/.rds
+cat > ~/.rds/config << 'EOF'
+server_url=http://YOUR_SERVER_IP:PORT
+api_key=YOUR_API_KEY
+EOF
+```
+
+或者使用环境变量：
+
+```bash
+export RDS_SERVER_URL=http://YOUR_SERVER_IP:PORT
+export RDS_API_KEY=YOUR_API_KEY
+```
+
+### 2. 安装 Client（可选）
+
+如果使用本仓库的 CLI 工具：
+
+```bash
+git clone https://github.com/xgbj/remote-device-server.git
+cd remote-device-server
+pip install -e .
+
+# 测试连接
+rds health
+```
 
 ## Agent 集成指南
 
-任何 agent 都可以通过 HTTP 调用以下 API 将本地项目推送到远端 A100 执行。不需要安装本仓库的 client，直接用 `curl` / `httpx` / `requests` 即可。
+任何 agent 都可以通过 HTTP 调用以下 API 将本地项目推送到远端 GPU 执行。不需要安装本仓库的 client，直接用 `curl` / `httpx` / `requests` 即可。
 
 ### 典型工作流：推送代码并执行
 
 ```bash
+# 从配置文件读取（或使用环境变量）
+SERVER_URL="http://YOUR_SERVER_IP:PORT"
+API_KEY="YOUR_API_KEY"
+
 # 1. 打包本地项目
 cd /path/to/your/project
 tar -czf /tmp/project.tar.gz -C /path/to/your/project .
 
 # 2. 上传到远端
-curl -X POST http://10.164.56.75:44401/files/upload \
-  -H "X-API-Key: remote_device_server" \
+curl -X POST ${SERVER_URL}/files/upload \
+  -H "X-API-Key: ${API_KEY}" \
   -F "file=@/tmp/project.tar.gz"
 # 返回: {"upload_id": "abc123", "filename": "project.tar.gz"}
 
 # 3. 提交任务（server 自动解压到工作目录）
-curl -X POST http://10.164.56.75:44401/tasks \
-  -H "X-API-Key: remote_device_server" \
+curl -X POST ${SERVER_URL}/tasks \
+  -H "X-API-Key: ${API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"command": "pip install -r requirements.txt && python run.py", "upload_id": "abc123"}'
 # 返回: {"id": "task_id", "status": "pending", ...}
 
 # 4. 轮询日志直到完成
-curl http://10.164.56.75:44401/tasks/{task_id}/logs?offset=0 \
-  -H "X-API-Key: remote_device_server"
+curl ${SERVER_URL}/tasks/{task_id}/logs?offset=0 \
+  -H "X-API-Key: ${API_KEY}"
 # 返回: {"data": "...", "offset": 1234}
 # 用返回的 offset 继续请求获取增量日志
 
 # 5. 检查任务状态
-curl http://10.164.56.75:44401/tasks/{task_id} \
-  -H "X-API-Key: remote_device_server"
+curl ${SERVER_URL}/tasks/{task_id} \
+  -H "X-API-Key: ${API_KEY}"
 # status: pending | running | success | failed | cancelled
 ```
 
 ### API 参考
 
-所有请求需要 header: `X-API-Key: remote_device_server`
+所有请求需要 header: `X-API-Key: YOUR_API_KEY`
 
 #### 健康检查
 
@@ -109,11 +140,28 @@ import tarfile
 import time
 from pathlib import Path
 
-SERVER = "http://10.164.56.75:44401"
-HEADERS = {"X-API-Key": "remote_device_server"}
+# 从配置文件或环境变量读取
+def load_config():
+    import os
+    config_file = Path.home() / ".rds" / "config"
+    if config_file.exists():
+        config = {}
+        for line in config_file.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                config[k.strip()] = v.strip()
+        return config
+    return {
+        "server_url": os.environ.get("RDS_SERVER_URL"),
+        "api_key": os.environ.get("RDS_API_KEY"),
+    }
+
+config = load_config()
+SERVER = config["server_url"]
+HEADERS = {"X-API-Key": config["api_key"]}
 
 def run_on_remote(project_dir: str, command: str) -> str:
-    """打包本地项目，推送到远端 A100 执行，返回完整日志。"""
+    """打包本地项目，推送到远端 GPU 执行，返回完整日志。"""
 
     # 1. 打包
     tar_path = "/tmp/_rds_upload.tar.gz"
@@ -170,3 +218,26 @@ print(output)
 - 最大并发任务数为 4，超出会排队等待
 - 日志通过文件持久化，任务结束后仍可查询
 - 如需指定 conda 环境，在 body 中传 `"conda_env": "env_name"`
+
+## Server 部署
+
+在远端 GPU 机器上：
+
+```bash
+# 1. 安装依赖
+pip install fastapi uvicorn[standard] pydantic aiosqlite pynvml psutil python-multipart httpx typer rich websockets
+
+# 2. 配置环境变量
+export RDS_API_KEY=your-secret-key
+export RDS_HOST=0.0.0.0
+export RDS_PORT=44401
+
+# 3. 启动 server
+python -m server.main
+```
+
+或使用快速启动脚本：
+
+```bash
+bash scripts/quick_start.sh
+```
