@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+# Root of the installed server package  →  .../remote_device_server/server/
+_SERVER_DIR = Path(__file__).parent
+# Default data directory sits next to the server/ package: .../remote_device_server/user_data/
+_DEFAULT_DATA_DIR = _SERVER_DIR.parent / "user_data"
 
 
 @dataclass
@@ -10,14 +15,13 @@ class Settings:
     api_key: str = "change-me-to-a-strong-random-key"
     host: str = "0.0.0.0"
     port: int = 44401
-    workspace_root: str = "/tmp/rds_workspace"
-    log_root: str = "/tmp/rds_logs"
+    workspace_root: str = field(default_factory=lambda: str(_DEFAULT_DATA_DIR / "workspace"))
+    log_root: str = field(default_factory=lambda: str(_DEFAULT_DATA_DIR / "logs"))
     max_concurrent_tasks: int = 4
-    db_path: str = "/tmp/rds.db"
+    db_path: str = field(default_factory=lambda: str(_DEFAULT_DATA_DIR / "rds.db"))
 
     def __post_init__(self):
         _INT_FIELDS = {"port", "max_concurrent_tasks"}
-        _PATH_FIELDS = {"workspace_root", "log_root", "db_path"}
 
         for name in ("api_key", "host", "port", "workspace_root",
                       "log_root", "max_concurrent_tasks", "db_path"):
@@ -36,6 +40,12 @@ class Settings:
         self.db_path = Path(self.db_path)
         self.workspace_root.mkdir(parents=True, exist_ok=True)
         self.log_root.mkdir(parents=True, exist_ok=True)
+
+    def get_client_workspace(self, username: str) -> Path:
+        """Return (and create) a dedicated workspace directory for a user."""
+        path = self.workspace_root / username
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
 
 settings = Settings()

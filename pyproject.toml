@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 rds-server = "server.main:run"
 rds = "client.cli:app"
+rds-shell = "client.shell:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

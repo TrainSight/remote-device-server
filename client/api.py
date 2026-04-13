@@ -5,11 +5,14 @@ from typing import Any, AsyncIterator
 
 import httpx
 
-from client.config import API_KEY, SERVER_URL
+from client.config import API_KEY, SERVER_URL, USERNAME
 
 
 def _headers() -> dict[str, str]:
-    return {"X-API-Key": API_KEY}
+    return {
+        "X-API-Key": API_KEY,
+        "X-RDS-Username": USERNAME,
+    }
 
 
 def _url(path: str) -> str:

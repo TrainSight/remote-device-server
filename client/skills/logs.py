@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
-import time
+from typing import Optional
 
 import typer
 from rich.console import Console
 
 from client import api
-from client.config import API_KEY, SERVER_URL
+from client.config import API_KEY, SERVER_URL, get_last_task_id, load_last_task
 from client.skills.base import Skill
 
 console = Console()
@@ -17,18 +16,43 @@ class LogsSkill(Skill):
     def register(self, cli: typer.Typer) -> None:
         @cli.command()
         def logs(
-            task_id: str = typer.Argument(..., help="Task ID"),
-            follow: bool = typer.Option(False, "--follow", "-f", help="Stream logs in real time"),
+            task_id: Optional[str] = typer.Argument(
+                None, help="Task ID, defaults to the latest submitted task"
+            ),
+            follow: bool = typer.Option(
+                False, "--follow", "-f", help="Stream logs in real time"
+            ),
         ):
             """View task logs."""
+            resolved_task_id = _resolve_task_id(task_id)
             if follow:
-                _follow_ws(task_id)
+                _follow_ws(resolved_task_id)
             else:
-                data = api.get_logs(task_id)
+                data = api.get_logs(resolved_task_id)
                 if data["data"]:
                     console.print(data["data"], end="")
                 else:
                     console.print("[dim]No logs yet.[/dim]")
+
+
+def _resolve_task_id(task_id: Optional[str]) -> str:
+    if task_id:
+        return task_id
+
+    last_task_id = get_last_task_id()
+    if not last_task_id:
+        console.print(
+            "[red]No recent task found. Run [bold]rds run[/bold] first or pass a task id.[/red]"
+        )
+        raise typer.Exit(1)
+
+    last_task = load_last_task() or {"task_id": last_task_id}
+    command_hint = last_task.get("command")
+    if command_hint:
+        console.print(f"[dim]Using latest task {last_task_id}: {command_hint}[/dim]")
+    else:
+        console.print(f"[dim]Using latest task {last_task_id}[/dim]")
+    return last_task_id
 
 
 def _follow_ws(task_id: str) -> None:
