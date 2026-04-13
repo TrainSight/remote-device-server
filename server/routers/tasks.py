@@ -127,15 +127,16 @@ async def get_logs(
 async def logs_websocket(websocket: WebSocket, task_id: str):
     await websocket.accept()
     try:
-        from server.auth import _key_to_client_id
-
         api_key = websocket.headers.get("x-api-key")
-        if api_key != settings.api_key:
+        username_header = websocket.headers.get("x-rds-username")
+        try:
+            username = await verify_api_key(
+                x_api_key=api_key,
+                x_rds_username=username_header,
+            )
+        except HTTPException:
             await websocket.close(code=1008, reason="Invalid API key")
             return
-
-        from server.auth import _key_to_fallback_username
-        username = _key_to_fallback_username(api_key)
 
         # Verify task ownership
         db = await get_db()

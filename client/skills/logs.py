@@ -6,8 +6,9 @@ import typer
 from rich.console import Console
 
 from client import api
-from client.config import API_KEY, SERVER_URL, get_last_task_id, load_last_task
+from client.config import API_KEY, SERVER_URL, USERNAME
 from client.skills.base import Skill
+from client.skills.task_utils import resolve_task_id
 
 console = Console()
 
@@ -24,7 +25,7 @@ class LogsSkill(Skill):
             ),
         ):
             """View task logs."""
-            resolved_task_id = _resolve_task_id(task_id)
+            resolved_task_id = resolve_task_id(task_id, "view logs for")
             if follow:
                 _follow_ws(resolved_task_id)
             else:
@@ -33,26 +34,6 @@ class LogsSkill(Skill):
                     console.print(data["data"], end="")
                 else:
                     console.print("[dim]No logs yet.[/dim]")
-
-
-def _resolve_task_id(task_id: Optional[str]) -> str:
-    if task_id:
-        return task_id
-
-    last_task_id = get_last_task_id()
-    if not last_task_id:
-        console.print(
-            "[red]No recent task found. Run [bold]rds run[/bold] first or pass a task id.[/red]"
-        )
-        raise typer.Exit(1)
-
-    last_task = load_last_task() or {"task_id": last_task_id}
-    command_hint = last_task.get("command")
-    if command_hint:
-        console.print(f"[dim]Using latest task {last_task_id}: {command_hint}[/dim]")
-    else:
-        console.print(f"[dim]Using latest task {last_task_id}[/dim]")
-    return last_task_id
 
 
 def _follow_ws(task_id: str) -> None:
@@ -64,7 +45,7 @@ def _follow_ws(task_id: str) -> None:
 
     ws_url = SERVER_URL.replace("http://", "ws://").replace("https://", "wss://")
     url = f"{ws_url}/tasks/{task_id}/logs/ws"
-    headers = {"X-API-Key": API_KEY}
+    headers = {"X-API-Key": API_KEY, "X-RDS-Username": USERNAME}
 
     try:
         with connect(url, additional_headers=headers) as ws:

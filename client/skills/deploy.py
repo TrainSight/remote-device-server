@@ -131,4 +131,8 @@ class DeploySkill(Skill):
             ssh_cmd = ["ssh", ssh_target, install_and_restart]
 
             console.print("[dim]Installing & restarting on remote...[/dim]")
-            subprocess.run(ssh_cmd)
+            result = subprocess.run(ssh_cmd)
+            if result.returncode != 0:
+                console.print(f"[red]remote install/restart failed (exit {result.returncode})[/red]")
+                raise typer.Exit(result.returncode)
+            console.print("[green]✓ Remote install/restart complete[/green]")

@@ -39,7 +39,8 @@ from rich.console import Console
 
 from client import api
 from client.config import save_last_task
-from client.skills.submit import _wait_and_print_logs, _resolve_task_id
+from client.skills.submit import _wait_and_print_logs
+from client.skills.task_utils import resolve_task_id
 
 console = Console()
 
@@ -81,7 +82,7 @@ def _cmd_rlogs(args: list[str]) -> None:
     task_id = args[0] if args else None
 
     try:
-        resolved = _resolve_task_id(task_id)
+        resolved = resolve_task_id(task_id, "view logs for")
     except SystemExit:
         return
 
@@ -97,7 +98,7 @@ def _cmd_rlogs(args: list[str]) -> None:
 
 
 def _follow_ws(task_id: str) -> None:
-    from client.config import API_KEY, SERVER_URL
+    from client.config import API_KEY, SERVER_URL, USERNAME
 
     try:
         from websockets.sync.client import connect
@@ -107,7 +108,7 @@ def _follow_ws(task_id: str) -> None:
 
     ws_url = SERVER_URL.replace("http://", "ws://").replace("https://", "wss://")
     url = f"{ws_url}/tasks/{task_id}/logs/ws"
-    headers = {"X-API-Key": API_KEY}
+    headers = {"X-API-Key": API_KEY, "X-RDS-Username": USERNAME}
 
     try:
         with connect(url, additional_headers=headers) as ws:
@@ -122,7 +123,7 @@ def _follow_ws(task_id: str) -> None:
 def _cmd_rinfo(args: list[str]) -> None:
     task_id = args[0] if args else None
     try:
-        resolved = _resolve_task_id(task_id)
+        resolved = resolve_task_id(task_id, "show info for")
     except SystemExit:
         return
     t = api.get_task(resolved)
@@ -154,7 +155,7 @@ def _cmd_rps(args: list[str]) -> None:
 def _cmd_rcancel(args: list[str]) -> None:
     task_id = args[0] if args else None
     try:
-        resolved = _resolve_task_id(task_id)
+        resolved = resolve_task_id(task_id, "cancel")
     except SystemExit:
         return
     result = api.cancel_task(resolved)

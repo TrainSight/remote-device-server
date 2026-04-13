@@ -7,8 +7,9 @@ import typer
 from rich.console import Console
 
 from client import api
-from client.config import get_last_task_id, load_last_task, save_last_task
+from client.config import save_last_task
 from client.skills.base import Skill
+from client.skills.task_utils import resolve_task_id
 
 console = Console()
 
@@ -89,7 +90,7 @@ class SubmitSkill(Skill):
             )
         ):
             """Cancel a running task."""
-            resolved_task_id = _resolve_task_id(task_id, "cancel")
+            resolved_task_id = resolve_task_id(task_id, "cancel")
             result = api.cancel_task(resolved_task_id)
             console.print(f"[yellow]{result['status']}[/yellow]")
 
@@ -120,29 +121,8 @@ class SubmitSkill(Skill):
             )
         ):
             """Show task details."""
-            resolved_task_id = _resolve_task_id(task_id, "show info for")
+            resolved_task_id = resolve_task_id(task_id, "show info for")
             t = api.get_task(resolved_task_id)
             for k, v in t.items():
                 if v is not None:
                     console.print(f"  [bold]{k}:[/bold] {v}")
-
-
-
-def _resolve_task_id(task_id: Optional[str], action: str) -> str:
-    if task_id:
-        return task_id
-
-    last_task_id = get_last_task_id()
-    if not last_task_id:
-        console.print(
-            f"[red]No recent task found. Run [bold]rds run[/bold] first or pass a task id to {action}.[/red]"
-        )
-        raise typer.Exit(1)
-
-    last_task = load_last_task() or {"task_id": last_task_id}
-    command_hint = last_task.get("command")
-    if command_hint:
-        console.print(f"[dim]Using latest task {last_task_id}: {command_hint}[/dim]")
-    else:
-        console.print(f"[dim]Using latest task {last_task_id}[/dim]")
-    return last_task_id
