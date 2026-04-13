@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 
 from client import api
+from client.config import save_last_task
 from client.skills.base import Skill
 
 console = Console()
@@ -40,8 +41,9 @@ class PushSkill(Skill):
 
             if run:
                 task = api.create_task(run, conda_env=conda, upload_id=upload_id)
+                save_last_task(task["id"], task.get("command"))
                 console.print(f"[green]Task submitted:[/green] {task['id']}")
-                console.print(f"  Use [bold]rds logs {task['id']} -f[/bold] to follow output")
+                console.print("  Use [bold]rds logs -f[/bold] to follow the latest task output")
 
 
 def _pack_directory(path: Path) -> Path:

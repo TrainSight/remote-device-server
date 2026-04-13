@@ -28,9 +28,15 @@ async def _init_tables(db: aiosqlite.Connection) -> None:
             created_at TEXT NOT NULL,
             started_at TEXT,
             finished_at TEXT,
-            working_dir TEXT
+            working_dir TEXT,
+            client_id TEXT
         )
     """)
+    # Migrate existing databases that lack the client_id column
+    try:
+        await db.execute("ALTER TABLE tasks ADD COLUMN client_id TEXT")
+    except Exception:
+        pass  # column already exists — safe to ignore
     await db.commit()
 
 

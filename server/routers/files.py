@@ -13,11 +13,15 @@ from server.config import settings
 router = APIRouter(prefix="/files", tags=["files"])
 
 
-@router.post("/upload", dependencies=[Depends(verify_api_key)])
-async def upload_file(file: UploadFile = File(...)) -> Dict[str, str]:
-    """Upload a tarball for task execution. Returns upload_id."""
+@router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    username: str = Depends(verify_api_key),
+) -> Dict[str, str]:
+    """Upload a tarball for task execution. Stored inside the user's workspace."""
+    client_ws = settings.get_client_workspace(username)
     upload_id = uuid.uuid4().hex[:12]
-    dest = settings.workspace_root / f"{upload_id}.tar.gz"
+    dest = client_ws / f"{upload_id}.tar.gz"
     with open(dest, "wb") as f:
         chunk = await file.read(1024 * 1024)
         while chunk:
@@ -26,10 +30,21 @@ async def upload_file(file: UploadFile = File(...)) -> Dict[str, str]:
     return {"upload_id": upload_id, "filename": file.filename or "unknown"}
 
 
-@router.get("/download", dependencies=[Depends(verify_api_key)])
-async def download_file(path: str) -> FileResponse:
-    """Download a file from the server."""
-    file_path = Path(path).resolve()
+@router.get("/download")
+async def download_file(
+    path: str,
+    username: str = Depends(verify_api_key),
+) -> FileResponse:
+    """Download a file from the server.
+
+    If `path` is relative it is resolved against the user's workspace,
+    otherwise the absolute path is used as-is (no jail enforcement here,
+    the server admin controls access via the API key).
+    """
+    file_path = Path(path)
+    if not file_path.is_absolute():
+        file_path = settings.get_client_workspace(username) / file_path
+    file_path = file_path.resolve()
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(404, "File not found")
     return FileResponse(file_path, filename=file_path.name)

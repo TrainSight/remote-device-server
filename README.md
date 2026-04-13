@@ -34,6 +34,13 @@ pip install -e .
 
 # 测试连接
 rds health
+
+# 提交任务后，直接使用最近一次任务
+rds run "python train.py"
+rds logs
+rds logs -f
+rds info
+rds cancel
 ```
 
 ## Agent 集成指南
